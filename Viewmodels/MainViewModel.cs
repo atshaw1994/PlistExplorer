@@ -181,6 +181,10 @@ public partial class MainViewModel : ObservableObject
         }
 
         ContainerViewModel.Initialize(initialElements);
+
+        // Refresh command states for Save / SaveAs UI buttons
+        SavePlistCommand.NotifyCanExecuteChanged();
+        SavePlistAsCommand.NotifyCanExecuteChanged();
     }
 
     private void ParseContainerChildren(XElement containerElement, ObservableCollection<PlistElementViewModel> targetCollection)
@@ -222,13 +226,17 @@ public partial class MainViewModel : ObservableObject
         {
             ElementName = keyName,
             ElementType = type,
+            // Convert all evaluated values cleanly to string representation
             ElementValue = type switch
             {
-                PlistElementType.Boolean => element.Name.LocalName.Equals("true", StringComparison.OrdinalIgnoreCase),
-                PlistElementType.Number => long.TryParse(element.Value, out var i) ? i : 0L,
+                PlistElementType.Boolean => element.Name.LocalName.Equals("true", StringComparison.OrdinalIgnoreCase) ? "true" : "false",
+                PlistElementType.Number => element.Value.Trim(),
                 PlistElementType.Data => element.Value.Trim(),
+                PlistElementType.Dictionary => $"{element.Elements("key").Count()} items",
+                PlistElementType.Array => $"{element.Elements().Count()} items",
                 _ => element.Value
-            }
+            },
+            RawXElement = element // Crucial for nested array/dict parsing and clipboard copies
         };
 
         var viewModel = new PlistElementViewModel(model);
