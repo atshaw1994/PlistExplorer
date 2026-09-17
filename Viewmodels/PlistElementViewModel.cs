@@ -11,6 +11,8 @@ public partial class PlistElementViewModel : ObservableObject
 {
     public PlistElement Model { get; }
     public ObservableCollection<PlistElementViewModel> Children { get; } = [];
+    public bool IsFalseBoolean => ElementType == PlistElementType.Boolean &&
+                            string.Equals(ElementValue!.ToString(), "false", StringComparison.OrdinalIgnoreCase);
 
     [ObservableProperty] public partial string ElementName { get; set; } = string.Empty;
 
@@ -41,12 +43,14 @@ public partial class PlistElementViewModel : ObservableObject
     {
         Model = new PlistElement
         {
-            ElementName = "NewDict",
-            ElementType = PlistElementType.Dictionary
+            ElementName = "BooleanElement",
+            ElementType = PlistElementType.Boolean,
+            ElementValue = false
         };
 
         ElementName = Model.ElementName;
         ElementType = Model.ElementType;
+        ElementValue = Model.ElementValue;
     }
 
     private void ParseChildren(XElement containerNode)
@@ -118,6 +122,7 @@ public partial class PlistElementViewModel : ObservableObject
         set
         {
             ElementValue = value;
+
             OnPropertyChanged(nameof(BoolValue));
         }
     }
@@ -177,6 +182,7 @@ public partial class PlistElementViewModel : ObservableObject
     partial void OnElementValueChanged(object? value)
     {
         Model.ElementValue = value;
+        OnPropertyChanged(nameof(IsFalseBoolean));
         OnPropertyChanged(nameof(DisplayName));
     }
 
