@@ -239,15 +239,10 @@ public partial class MainViewModel : ObservableObject
             RawXElement = element // Crucial for nested array/dict parsing and clipboard copies
         };
 
+        // The PlistElementViewModel constructor handles parsing child elements via model.RawXElement
         var viewModel = new PlistElementViewModel(model);
         targetCollection.Add(viewModel);
-
-        if (type == PlistElementType.Dictionary || type == PlistElementType.Array)
-        {
-            ParseContainerChildren(element, viewModel.Children);
-        }
     }
-
     private static PlistElementType GetPlistElementType(XElement element) => element.Name.LocalName.ToLowerInvariant() switch
     {
         "dict" => PlistElementType.Dictionary,
