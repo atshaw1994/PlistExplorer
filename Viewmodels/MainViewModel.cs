@@ -14,13 +14,24 @@ public partial class MainViewModel : ObservableObject
 {
     private string? _currentFilePath;
     private readonly IRecentFilesService _recentFilesService;
+    private string _baseWindowTitle = "PlistExplorer";
+
+    // The full XML document (declaration + DOCTYPE + root) for the currently loaded/created plist.
+    // Using XDocument instead of a bare XElement preserves the <?xml ... ?> declaration and the
+    // Apple plist DOCTYPE across load/save, which XElement.Load/Save silently discard.
+    private XDocument? _document;
 
     public PlistElementContainerViewModel ContainerViewModel { get; } = new();
-    public XElement LoadedElement { get; set; } = new("Root");
+    public XElement? LoadedElement => _document?.Root;
     public ObservableCollection<string> RecentFiles { get; } = [];
-    public bool CanSavePlist() => LoadedElement != null && _currentFilePath != null;
+    public bool CanSavePlist() => _document != null;
 
     [ObservableProperty] public partial string WindowTitle { get; set; } = "PlistExplorer";
+    [ObservableProperty] public partial bool HasUnsavedChanges { get; set; }
+
+    partial void OnHasUnsavedChangesChanged(bool value) => UpdateWindowTitle();
+
+    private void UpdateWindowTitle() => WindowTitle = _baseWindowTitle + (HasUnsavedChanges ? " *" : "");
 
     public MainViewModel(IRecentFilesService recentFilesService)
     {
@@ -29,9 +40,10 @@ public partial class MainViewModel : ObservableObject
         // Load persisted files on startup
         var loaded = _recentFilesService.LoadRecentFiles();
         foreach (var path in loaded)
-        {
             RecentFiles.Add(path);
-        }
+
+        // Track unsaved changes whenever the element tree is structurally or value-modified
+        ContainerViewModel.DataChanged += () => HasUnsavedChanges = true;
     }
 
     // Parameterless fallback constructor for WPF/XAML default instantiation
@@ -55,40 +67,14 @@ public partial class MainViewModel : ObservableObject
 
         if (dialog.ShowDialog() == true)
         {
-            try
-            {
-                _currentFilePath = dialog.FileName;
-                LoadedElement = XElement.Load(_currentFilePath);
-
-                PopulateElements();
-
-                WindowTitle = "PlistExplorer - " + Path.GetFileName(_currentFilePath);
-                AddRecentFile(_currentFilePath);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Failed to load plist file:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            LoadPlistFile(dialog.FileName);
         }
     }
 
     [RelayCommand]
     public void OpenFile(string filePath)
     {
-        try
-        {
-            _currentFilePath = filePath;
-            LoadedElement = XElement.Load(_currentFilePath);
-
-            PopulateElements();
-
-            WindowTitle = "PlistExplorer - " + Path.GetFileName(_currentFilePath);
-            AddRecentFile(_currentFilePath);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Failed to load plist file:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
+        LoadPlistFile(filePath);
     }
 
     [RelayCommand]
@@ -102,31 +88,41 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
+        LoadPlistFile(filePath);
+    }
+
+    // Shared load logic for OpenPlist/OpenFile/OpenRecentFile: loads the document, refreshes the
+    // view models, updates the window title, and records the recent-files entry.
+    private void LoadPlistFile(string filePath)
+    {
         try
         {
             _currentFilePath = filePath;
-            LoadedElement = XElement.Load(_currentFilePath);
+            _document = XDocument.Load(filePath);
 
             PopulateElements();
 
-            WindowTitle = "PlistExplorer - " + Path.GetFileName(_currentFilePath);
+            _baseWindowTitle = "PlistExplorer - " + Path.GetFileName(_currentFilePath);
+            HasUnsavedChanges = false;
+            UpdateWindowTitle();
             AddRecentFile(_currentFilePath);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Failed to load plist file:\n{ex.Message}", "Error",
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"Failed to load plist file:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
     [RelayCommand(CanExecute = nameof(CanSavePlist))]
     public void SavePlist()
     {
-        if (LoadedElement == null || _currentFilePath == null) return;
+        if (_document == null || _currentFilePath == null) return;
 
         try
         {
-            LoadedElement.Save(_currentFilePath);
+            SyncDocumentFromViewModel();
+            _document.Save(_currentFilePath);
+            HasUnsavedChanges = false;
             MessageBox.Show("File saved successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
@@ -138,29 +134,58 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSavePlist))]
     public void SavePlistAs()
     {
-        if (LoadedElement == null) return;
+        if (_document == null) return;
 
-        if (string.IsNullOrEmpty(_currentFilePath))
+        var dialog = new SaveFileDialog
         {
-            var dialog = new SaveFileDialog
-            {
-                Filter = "Property List (*.plist)|*.plist|XML Files (*.xml)|*.xml|All Files (*.*)|*.*",
-                Title = "Save Plist File",
-                FileName = "document.plist"
-            };
+            Filter = "Property List (*.plist)|*.plist|XML Files (*.xml)|*.xml|All Files (*.*)|*.*",
+            Title = "Save Plist File",
+            FileName = "document.plist"
+        };
 
-            if (dialog.ShowDialog() != true) return;
-            _currentFilePath = dialog.FileName;
-        }
+        if (dialog.ShowDialog() != true) return;
+        _currentFilePath = dialog.FileName;
 
         try
         {
-            LoadedElement.Save(_currentFilePath);
+            SyncDocumentFromViewModel();
+            _document.Save(_currentFilePath);
+            _baseWindowTitle = "PlistExplorer - " + Path.GetFileName(_currentFilePath);
+            HasUnsavedChanges = false;
+            UpdateWindowTitle();
             MessageBox.Show("File saved successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
             MessageBox.Show($"Failed to save file:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    // Rebuilds the document's root contents from the (possibly edited/added/deleted) view model tree.
+    // Structural edits (add/delete/paste) are only ever applied to the ContainerViewModel's view
+    // model hierarchy, not to the original XML document, so this must run before every save.
+    private void SyncDocumentFromViewModel()
+    {
+        if (_document == null) return;
+
+        var rebuiltRoot = ContainerViewModel.BuildRootElement();
+        var root = _document.Root;
+
+        if (root != null && root.Name.LocalName == "plist")
+        {
+            var existingRoot = root.Elements().FirstOrDefault();
+            if (existingRoot != null)
+            {
+                existingRoot.ReplaceWith(rebuiltRoot);
+            }
+            else
+            {
+                root.Add(rebuiltRoot);
+            }
+        }
+        else
+        {
+            _document.ReplaceNodes(rebuiltRoot);
         }
     }
 
@@ -171,16 +196,17 @@ public partial class MainViewModel : ObservableObject
     {
         var initialElements = new ObservableCollection<PlistElementViewModel>();
 
-        XElement? targetRoot = LoadedElement.Name.LocalName == "plist"
-            ? LoadedElement.Elements().FirstOrDefault()
-            : LoadedElement;
+        XElement? root = _document?.Root;
+        XElement? targetRoot = root?.Name.LocalName == "plist"
+            ? root.Elements().FirstOrDefault()
+            : root;
 
         if (targetRoot != null)
         {
             ParseContainerChildren(targetRoot, initialElements);
         }
 
-        ContainerViewModel.Initialize(initialElements);
+        ContainerViewModel.Initialize(initialElements, targetRoot?.Name.LocalName ?? "dict");
 
         // Refresh command states for Save / SaveAs UI buttons
         SavePlistCommand.NotifyCanExecuteChanged();
@@ -225,23 +251,16 @@ public partial class MainViewModel : ObservableObject
 
     private void AddElementToCollection(XElement element, string keyName, ObservableCollection<PlistElementViewModel> targetCollection)
     {
-        PlistElementType type = GetPlistElementType(element);
+        // Delegates to the shared helper so booleans, base64 data, and integer/real numbers
+        // are parsed with correct, consistent types across the whole app.
+        var model = PlistElementViewModel.CreateModelFromNode(keyName, element);
 
-        var model = new PlistElement
+        // Containers display an item-count summary instead of their (irrelevant) raw text value
+        model.ElementValue = model.ElementType switch
         {
-            ElementName = keyName,
-            ElementType = type,
-            // Convert all evaluated values cleanly to string representation
-            ElementValue = type switch
-            {
-                PlistElementType.Boolean => element.Name.LocalName.Equals("true", StringComparison.OrdinalIgnoreCase) ? "true" : "false",
-                PlistElementType.Number => element.Value.Trim(),
-                PlistElementType.Data => element.Value.Trim(),
-                PlistElementType.Dictionary => $"{element.Elements("key").Count()} items",
-                PlistElementType.Array => $"{element.Elements().Count()} items",
-                _ => element.Value
-            },
-            RawXElement = element // Crucial for nested array/dict parsing and clipboard copies
+            PlistElementType.Dictionary => $"{element.Elements("key").Count()} items",
+            PlistElementType.Array => $"{element.Elements().Count()} items",
+            _ => model.ElementValue
         };
 
         // The PlistElementViewModel constructor handles parsing child elements via model.RawXElement
@@ -249,22 +268,9 @@ public partial class MainViewModel : ObservableObject
         targetCollection.Add(viewModel);
     }
 
-    private static PlistElementType GetPlistElementType(XElement element) => element.Name.LocalName.ToLowerInvariant() switch
-    {
-        "dict" => PlistElementType.Dictionary,
-        "array" => PlistElementType.Array,
-        "string" => PlistElementType.String,
-        "integer" or "real" => PlistElementType.Number,
-        "true" or "false" => PlistElementType.Boolean,
-        "date" => PlistElementType.Date,
-        "data" => PlistElementType.Data,
-        "uid" => PlistElementType.UID,
-        _ => PlistElementType.String
-    };
-
     private void LoadSampleData()
     {
-        var samplePlist = new XElement("plist",
+        var samplePlist = new XElement("plist", new XAttribute("version", "1.0"),
             new XElement("dict",
                 new XElement("key", "SampleDict"),
                 new XElement("dict",
@@ -291,9 +297,15 @@ public partial class MainViewModel : ObservableObject
             )
         );
 
-        LoadedElement = samplePlist;
+        _document = CreatePlistDocument(samplePlist);
         PopulateElements(); // This parses elements and calls ContainerViewModel.Initialize()
     }
+
+    // Builds a standard plist XDocument (XML declaration + Apple DOCTYPE) around the given root.
+    private static XDocument CreatePlistDocument(XElement root) => new(
+        new XDeclaration("1.0", "UTF-8", null),
+        new XDocumentType("plist", "-//Apple//DTD PLIST 1.0//EN", "http://www.apple.com/DTDs/PropertyList-1.0.dtd", null),
+        root);
 
     private void AddRecentFile(string filePath)
     {

@@ -68,13 +68,7 @@ public partial class PlistElementViewModel : ObservableObject
                     string keyName = elements[i].Value;
                     XElement valNode = elements[i + 1];
 
-                    var childModel = new PlistElement
-                    {
-                        ElementName = keyName,
-                        ElementType = GetTypeFromNode(valNode),
-                        ElementValue = valNode.Value,
-                        RawXElement = valNode
-                    };
+                    var childModel = CreateModelFromNode(keyName, valNode);
 
                     Children.Add(new PlistElementViewModel(childModel));
                     i++; // Skip the value node on next iteration
@@ -87,13 +81,7 @@ public partial class PlistElementViewModel : ObservableObject
             int index = 0;
             foreach (var valNode in containerNode.Elements())
             {
-                var childModel = new PlistElement
-                {
-                    ElementName = $"Item {index++}",
-                    ElementType = GetTypeFromNode(valNode),
-                    ElementValue = valNode.Value,
-                    RawXElement = valNode
-                };
+                var childModel = CreateModelFromNode($"Item {index++}", valNode);
 
                 Children.Add(new PlistElementViewModel(childModel));
             }
@@ -114,6 +102,43 @@ public partial class PlistElementViewModel : ObservableObject
         "dict" => PlistElementType.Dictionary,
         _ => PlistElementType.String
     };
+
+    // Builds a correctly-typed PlistElement from a raw XML node: booleans become real bool values,
+    // data becomes decoded bytes (plist <data> is base64, not hex), and the original integer/real
+    // tag name is preserved so numbers round-trip correctly on save.
+    internal static PlistElement CreateModelFromNode(string keyName, XElement node)
+    {
+        var type = GetTypeFromNode(node);
+
+        object? value = type switch
+        {
+            PlistElementType.Boolean => node.Name.LocalName.Equals("true", StringComparison.OrdinalIgnoreCase),
+            PlistElementType.Data => TryDecodeBase64(node.Value.Trim()),
+            _ => node.Value
+        };
+
+        return new PlistElement
+        {
+            ElementName = keyName,
+            ElementType = type,
+            ElementValue = value,
+            RawXElement = node,
+            NumericSubType = node.Name.LocalName.Equals("real", StringComparison.OrdinalIgnoreCase) ? "real" : "integer"
+        };
+    }
+
+    internal static object TryDecodeBase64(string base64)
+    {
+        try
+        {
+            return Convert.FromBase64String(base64);
+        }
+        catch
+        {
+            // Fall back to the raw text if it isn't valid base64 (malformed input)
+            return base64;
+        }
+    }
 
     // Typed accessor for Boolean DataGrid template
     public bool BoolValue
@@ -141,6 +166,18 @@ public partial class PlistElementViewModel : ObservableObject
             {
                 ElementValue = value; // Fallback to raw input if invalid hex
             }
+            OnPropertyChanged(nameof(HexValue));
+        }
+    }
+
+    // Base64 accessor for Data elements, matching the plist <data> element's actual encoding.
+    public string Base64Value
+    {
+        get => ElementValue is byte[] bytes ? Convert.ToBase64String(bytes) : ElementValue?.ToString() ?? string.Empty;
+        set
+        {
+            ElementValue = TryDecodeBase64(value);
+            OnPropertyChanged(nameof(Base64Value));
             OnPropertyChanged(nameof(HexValue));
         }
     }
@@ -176,18 +213,13 @@ public partial class PlistElementViewModel : ObservableObject
         }
     }
 
-    // Keep DisplayName updated whenever a child's name or value changes
+    // Keep DisplayName updated whenever a child's name or value changes.
+    // Note: this only updates the view model; the underlying XML document is rebuilt from
+    // view-model state at save time (see PlistElementContainerViewModel.BuildRootElement),
+    // so there is no need to keep Model.RawXElement in sync here.
     partial void OnElementNameChanged(string value)
     {
         Model.ElementName = value;
-        if (Model.RawXElement != null)
-        {
-            var previousNode = Model.RawXElement.PreviousNode as XElement;
-            if (previousNode != null && previousNode.Name.LocalName.Equals("key", StringComparison.OrdinalIgnoreCase))
-            {
-                previousNode.Value = value ?? string.Empty;
-            }
-        }
         OnPropertyChanged(nameof(DisplayName));
     }
 
@@ -195,22 +227,9 @@ public partial class PlistElementViewModel : ObservableObject
     {
         Model.ElementType = value;
 
-        // Keep the XML element name in sync with the new type
-        if (Model.RawXElement != null)
+        if (value == PlistElementType.Number)
         {
-            string newXmlName = value switch
-            {
-                PlistElementType.String => "string",
-                PlistElementType.Number => "integer",
-                PlistElementType.Boolean => "true",
-                PlistElementType.Data => "data",
-                PlistElementType.Date => "date",
-                PlistElementType.Dictionary => "dict",
-                PlistElementType.Array => "array",
-                _ => "string"
-            };
-
-            Model.RawXElement.Name = newXmlName;
+            Model.NumericSubType = "integer";
         }
 
         OnPropertyChanged(nameof(ElementType));
@@ -219,15 +238,6 @@ public partial class PlistElementViewModel : ObservableObject
     partial void OnElementValueChanged(object? value)
     {
         Model.ElementValue = value;
-
-        // Sync the value directly to the XML element for primitive types safely
-        if (Model.RawXElement != null &&
-            Model.ElementType != PlistElementType.Dictionary &&
-            Model.ElementType != PlistElementType.Array)
-        {
-            // Prevent ArgumentNullException by using string.Empty for null inputs
-            Model.RawXElement.Value = value?.ToString() ?? string.Empty;
-        }
 
         OnPropertyChanged(nameof(IsFalseBoolean));
         OnPropertyChanged(nameof(DisplayName));

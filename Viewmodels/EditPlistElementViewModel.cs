@@ -1,6 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using PlistExplorer.Models;
 using System.Collections.ObjectModel;
 using System.Windows;
 

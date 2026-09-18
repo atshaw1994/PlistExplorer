@@ -11,31 +11,29 @@ namespace PlistExplorer.Viewmodels
 {
     public partial class PlistElementContainerViewModel : ObservableObject
     {
-        private readonly Stack<List<PlistElementViewModel>> _backStack = new();
-        private readonly Stack<List<PlistElementViewModel>> _forwardStack = new();
+        private readonly Stack<PlistElementViewModel?> _backStack = new();
+        private readonly Stack<PlistElementViewModel?> _forwardStack = new();
         private readonly List<string> _pathSegments = [];
+        private List<PlistElementViewModel> _rootElements = [];
+        private PlistElementViewModel? _currentContainer;
         private bool CanNavigateBack() => _backStack.Count > 0;
         private bool CanNavigateForward() => _forwardStack.Count > 0;
 
+        // The collection currently backing the displayed view (root list or the active container's children).
+        // This is the actual source of truth: mutating it (add/remove) persists structural changes.
+        private IList<PlistElementViewModel> CurrentSource => (IList<PlistElementViewModel>?)_currentContainer?.Children ?? _rootElements;
+
+        public string RootElementType { get; private set; } = "dict";
+
         public ObservableCollection<PlistElementViewModel> LoadedElements { get; } = [];
 
-        [ObservableProperty] public partial string CurrentPath { get; set; } = "Root";
+        // Raised whenever the underlying element tree is structurally or value-modified
+        // (add/delete/paste/leaf edit), so MainViewModel can track unsaved changes.
+        public event Action? DataChanged;
 
-        public void Initialize(ObservableCollection<PlistElementViewModel> rootElements)
-        {
-            LoadedElements.Clear();
-            _backStack.Clear();
-            _forwardStack.Clear();
-            _pathSegments.Clear();
+        [ObservableProperty] public partial string CurrentPath { get; set; }
 
-            _pathSegments.Add("Root");
-            UpdatePathText();
-
-            foreach (var element in rootElements)
-            {
-                LoadedElements.Add(element);
-            }
-        }
+        #region Commands
 
         [RelayCommand]
         public void OpenElement(PlistElementViewModel element)
@@ -45,24 +43,24 @@ namespace PlistExplorer.Viewmodels
 
             if (isContainer)
             {
-                // Snapshot active view onto back stack and clear forward history on new drill-down
-                _backStack.Push([.. LoadedElements]);
+                // Remember the current container so we can restore it when navigating back
+                _backStack.Push(_currentContainer);
                 _forwardStack.Clear();
 
                 _pathSegments.Add(element.ElementName);
                 UpdatePathText();
 
-                LoadedElements.Clear();
-                foreach (var child in element.Children)
-                {
-                    LoadedElements.Add(child);
-                }
+                _currentContainer = element;
+                RefreshDisplayFromSource();
 
                 NotifyCanExecuteChanged();
             }
             else
             {
-                OpenEditWindowForLeaf(element);
+                if (OpenEditWindowForLeaf(element))
+                {
+                    DataChanged?.Invoke();
+                }
             }
         }
 
@@ -105,6 +103,10 @@ namespace PlistExplorer.Viewmodels
                     var elementViewModel = ParseElementFromXml(node);
                     if (elementViewModel != null)
                     {
+                        elementViewModel.ElementName = GetUniqueElementName(elementViewModel.ElementName);
+
+                        // Add to the actual source collection so the change persists (not just the display view)
+                        CurrentSource.Add(elementViewModel);
                         LoadedElements.Add(elementViewModel);
                     }
                 }
@@ -113,78 +115,96 @@ namespace PlistExplorer.Viewmodels
             {
                 // Fail quietly or log if the text on clipboard isn't valid XML
             }
+
+            DataChanged?.Invoke();
         }
 
         [RelayCommand]
         public void AddNewElement(string elementType)
         {
-            switch (elementType)
+            PlistElementViewModel? newElement = elementType switch
             {
-                case "Dict":
-                    LoadedElements.Add(new PlistElementViewModel(new PlistElement
-                    {
-                        ElementName = "NewDictionary",
-                        ElementType = PlistElementType.Dictionary
-                    }));
-                    break;
-                case "Array":
-                    LoadedElements.Add(new PlistElementViewModel(new PlistElement
-                    {
-                        ElementName = "NewArray",
-                        ElementType = PlistElementType.Array
-                    }));
-                    break;
-                case "Boolean":
-                    LoadedElements.Add(new PlistElementViewModel(new PlistElement
-                    {
-                        ElementName = "NewBoolean",
-                        ElementType = PlistElementType.Boolean,
-                        ElementValue = false
-                    }));
-                    break;
-                case "Data":
-                    LoadedElements.Add(new PlistElementViewModel(new PlistElement
-                    {
-                        ElementName = "NewData",
-                        ElementType = PlistElementType.Data,
-                        ElementValue = string.Empty
-                    }));
-                    break;
-                case "Date":
-                    LoadedElements.Add(new PlistElementViewModel(new PlistElement
-                    {
-                        ElementName = "NewDate",
-                        ElementType = PlistElementType.Date,
-                        ElementValue = DateTime.Now
-                    }));
-                    break;
-                case "Number":
-                    LoadedElements.Add(new PlistElementViewModel(new PlistElement
-                    {
-                        ElementName = "NewNumber",
-                        ElementType = PlistElementType.Number,
-                        ElementValue = 0
-                    }));
-                    break;
-                case "UID":
-                    LoadedElements.Add(new PlistElementViewModel(new PlistElement
-                    {
-                        ElementName = "NewUID",
-                        ElementType = PlistElementType.UID,
-                        ElementValue = string.Empty
-                    }));
-                    break;
-                case "String":
-                    LoadedElements.Add(new PlistElementViewModel(new PlistElement
-                    {
-                        ElementName = "NewString",
-                        ElementType = PlistElementType.String,
-                        ElementValue = string.Empty
-                    }));
-                    break;
-                default:
-                    break;
+                "Dict" => new PlistElementViewModel(new PlistElement
+                {
+                    ElementName = "NewDictionary",
+                    ElementType = PlistElementType.Dictionary
+                }),
+                "Array" => new PlistElementViewModel(new PlistElement
+                {
+                    ElementName = "NewArray",
+                    ElementType = PlistElementType.Array
+                }),
+                "Boolean" => new PlistElementViewModel(new PlistElement
+                {
+                    ElementName = "NewBoolean",
+                    ElementType = PlistElementType.Boolean,
+                    ElementValue = false
+                }),
+                "Data" => new PlistElementViewModel(new PlistElement
+                {
+                    ElementName = "NewData",
+                    ElementType = PlistElementType.Data,
+                    ElementValue = string.Empty
+                }),
+                "Date" => new PlistElementViewModel(new PlistElement
+                {
+                    ElementName = "NewDate",
+                    ElementType = PlistElementType.Date,
+                    ElementValue = DateTime.Now
+                }),
+                "Number" => new PlistElementViewModel(new PlistElement
+                {
+                    ElementName = "NewNumber",
+                    ElementType = PlistElementType.Number,
+                    ElementValue = 0
+                }),
+                "UID" => new PlistElementViewModel(new PlistElement
+                {
+                    ElementName = "NewUID",
+                    ElementType = PlistElementType.UID,
+                    ElementValue = string.Empty
+                }),
+                "String" => new PlistElementViewModel(new PlistElement
+                {
+                    ElementName = "NewString",
+                    ElementType = PlistElementType.String,
+                    ElementValue = string.Empty
+                }),
+                _ => null
+            };
+
+            if (newElement != null)
+            {
+                newElement.ElementName = GetUniqueElementName(newElement.ElementName);
+
+                // Add to the actual source collection so the change persists (not just the display view)
+                CurrentSource.Add(newElement);
+                LoadedElements.Add(newElement);
+                DataChanged?.Invoke();
             }
+        }
+
+        // Only dictionaries require unique keys; arrays/root arrays can have duplicate names freely.
+        private bool IsCurrentSourceDictionary =>
+            _currentContainer?.ElementType == PlistElementType.Dictionary ||
+            (_currentContainer == null && RootElementType.Equals("dict", StringComparison.OrdinalIgnoreCase));
+
+        private string GetUniqueElementName(string desiredName)
+        {
+            if (!IsCurrentSourceDictionary) return desiredName;
+
+            var existingNames = new HashSet<string>(CurrentSource.Select(e => e.ElementName), StringComparer.Ordinal);
+            if (!existingNames.Contains(desiredName)) return desiredName;
+
+            int suffix = 2;
+            string candidate;
+            do
+            {
+                candidate = $"{desiredName} ({suffix})";
+                suffix++;
+            } while (existingNames.Contains(candidate));
+
+            return candidate;
         }
 
         [RelayCommand]
@@ -219,7 +239,10 @@ namespace PlistExplorer.Viewmodels
         {
             if (element != null && LoadedElements.Contains(element))
             {
+                // Remove from the actual source collection so the change persists (not just the display view)
+                CurrentSource.Remove(element);
                 LoadedElements.Remove(element);
+                DataChanged?.Invoke();
             }
         }
 
@@ -228,7 +251,10 @@ namespace PlistExplorer.Viewmodels
         {
             if (element != null && LoadedElements.Contains(element))
             {
-                OpenEditWindowForLeaf(element);
+                if (OpenEditWindowForLeaf(element))
+                {
+                    DataChanged?.Invoke();
+                }
             }
         }
 
@@ -237,10 +263,10 @@ namespace PlistExplorer.Viewmodels
         {
             if (_backStack.Count == 0) return;
 
-            // Save current view state to forward stack before going back
-            _forwardStack.Push([.. LoadedElements]);
+            // Save current container to forward stack before going back
+            _forwardStack.Push(_currentContainer);
 
-            var previousState = _backStack.Pop();
+            _currentContainer = _backStack.Pop();
 
             if (_pathSegments.Count > 1)
             {
@@ -248,11 +274,7 @@ namespace PlistExplorer.Viewmodels
                 UpdatePathText();
             }
 
-            LoadedElements.Clear();
-            foreach (var item in previousState)
-            {
-                LoadedElements.Add(item);
-            }
+            RefreshDisplayFromSource();
 
             NotifyCanExecuteChanged();
         }
@@ -262,16 +284,12 @@ namespace PlistExplorer.Viewmodels
         {
             if (_forwardStack.Count == 0) return;
 
-            // Save current view state to back stack before going forward
-            _backStack.Push([.. LoadedElements]);
+            // Save current container to back stack before going forward
+            _backStack.Push(_currentContainer);
 
-            var nextState = _forwardStack.Pop();
+            _currentContainer = _forwardStack.Pop();
 
-            LoadedElements.Clear();
-            foreach (var item in nextState)
-            {
-                LoadedElements.Add(item);
-            }
+            RefreshDisplayFromSource();
 
             // Re-append folder label if we're moving forward into known history
             NotifyCanExecuteChanged();
@@ -284,9 +302,65 @@ namespace PlistExplorer.Viewmodels
             NavigateBack();
         }
 
+        #endregion
+
+        public void Initialize(ObservableCollection<PlistElementViewModel> rootElements, string rootElementType = "dict")
+        {
+            _rootElements = [.. rootElements];
+            _currentContainer = null;
+            RootElementType = rootElementType;
+
+            _backStack.Clear();
+            _forwardStack.Clear();
+            _pathSegments.Clear();
+
+            _pathSegments.Add("Root");
+            UpdatePathText();
+
+            RefreshDisplayFromSource();
+        }
+
+        // Rebuilds the XML tree from the current (possibly edited/added/deleted) view model hierarchy.
+        // This is the authoritative source used when saving, since structural edits (add/delete/paste)
+        // are only ever applied to the view model tree (_rootElements / element.Children), not the
+        // original XElement document.
+        public XElement BuildRootElement()
+        {
+            var root = new XElement(RootElementType);
+
+            foreach (var element in _rootElements)
+            {
+                var xml = ToXElement(element);
+
+                if (RootElementType.Equals("array", StringComparison.OrdinalIgnoreCase))
+                {
+                    var valueOnly = xml.Elements().LastOrDefault();
+                    if (valueOnly != null)
+                    {
+                        root.Add(valueOnly);
+                    }
+                }
+                else
+                {
+                    root.Add(xml.Elements());
+                }
+            }
+
+            return root;
+        }
+
+        private void RefreshDisplayFromSource()
+        {
+            LoadedElements.Clear();
+            foreach (var element in CurrentSource)
+            {
+                LoadedElements.Add(element);
+            }
+        }
+
         private void UpdatePathText() => CurrentPath = string.Join("/", _pathSegments);
 
-        private static void OpenEditWindowForLeaf(PlistElementViewModel element)
+        private static bool OpenEditWindowForLeaf(PlistElementViewModel element)
         {
             // 1. Create a deep or detached copy for editing so changes aren't live until saved
             var tempModel = new PlistElement
@@ -294,6 +368,7 @@ namespace PlistExplorer.Viewmodels
                 ElementName = element.ElementName,
                 ElementType = element.ElementType,
                 ElementValue = element.ElementValue,
+                NumericSubType = element.Model.NumericSubType,
                 RawXElement = element.Model.RawXElement != null ? new XElement(element.Model.RawXElement) : null
             };
 
@@ -321,8 +396,12 @@ namespace PlistExplorer.Viewmodels
                 element.ElementName = tempViewModel.ElementName;
                 element.ElementType = tempViewModel.ElementType;
                 element.ElementValue = tempViewModel.ElementValue;
+                element.Model.NumericSubType = tempViewModel.Model.NumericSubType;
                 element.Model.RawXElement = tempViewModel.Model.RawXElement;
+                return true;
             }
+
+            return false;
         }
 
         private static XElement ToXElement(PlistElementViewModel vm)
@@ -352,11 +431,17 @@ namespace PlistExplorer.Viewmodels
                     break;
 
                 case PlistElementType.Boolean:
-                    valueNode = vm.ElementValue!.ToString()!.Equals("true", StringComparison.CurrentCultureIgnoreCase) ? new XElement("true") : new XElement("false");
+                    valueNode = vm.ElementValue is bool b
+                        ? (b ? new XElement("true") : new XElement("false"))
+                        : (vm.ElementValue?.ToString()?.Equals("true", StringComparison.OrdinalIgnoreCase) == true ? new XElement("true") : new XElement("false"));
                     break;
 
                 case PlistElementType.Number:
-                    valueNode = new XElement("integer", vm.ElementValue);
+                    valueNode = new XElement(vm.Model.NumericSubType == "real" ? "real" : "integer", vm.ElementValue);
+                    break;
+
+                case PlistElementType.Data:
+                    valueNode = new XElement("data", vm.ElementValue is byte[] bytes ? Convert.ToBase64String(bytes) : vm.ElementValue);
                     break;
 
                 default:
@@ -407,36 +492,18 @@ namespace PlistExplorer.Viewmodels
 
         private static PlistElementViewModel CreateViewModel(string keyName, XElement valueElement)
         {
-            var (type, value) = MapXmlToElementType(valueElement);
+            // Reuse the shared parsing helper so pasted content gets the same correct typing
+            // (real bool values, decoded base64 data, preserved integer/real subtype) as loaded files.
+            var model = PlistElementViewModel.CreateModelFromNode(keyName, valueElement);
 
-            var model = new PlistElement
+            model.ElementValue = model.ElementType switch
             {
-                ElementName = keyName,
-                ElementType = type,
-                ElementValue = value,
-                // Store the raw XML node so nested children are preserved
-                RawXElement = valueElement
+                PlistElementType.Dictionary => $"{valueElement.Elements("key").Count()} items",
+                PlistElementType.Array => $"{valueElement.Elements().Count()} items",
+                _ => model.ElementValue
             };
 
             return new PlistElementViewModel(model);
-        }
-
-        private static (PlistElementType Type, string Value) MapXmlToElementType(XElement element)
-        {
-            return element.Name.LocalName.ToLower() switch
-            {
-                "string" => (PlistElementType.String, element.Value),
-                "integer" => (PlistElementType.Number, element.Value),
-                "real" => (PlistElementType.Number, element.Value),
-                "true" => (PlistElementType.Boolean, "true"),
-                "false" => (PlistElementType.Boolean, "false"),
-                "date" => (PlistElementType.Date, element.Value),
-                "data" => (PlistElementType.Data, element.Value),
-                "uid" => (PlistElementType.UID, element.Value),
-                "array" => (PlistElementType.Array, $"{element.Elements().Count()} items"),
-                "dict" => (PlistElementType.Dictionary, $"{element.Elements("key").Count()} items"),
-                _ => (PlistElementType.String, element.Value)
-            };
         }
 
         private void NotifyCanExecuteChanged()

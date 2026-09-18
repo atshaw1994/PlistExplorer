@@ -14,6 +14,10 @@ public class PlistElement
 
     // Property required for holding raw XML nodes during deep serialization
     public XElement? RawXElement { get; set; }
+
+    // Preserves the original plist numeric tag ("integer" or "real") so round-tripping
+    // a <real> value doesn't get silently rewritten as <integer> on save.
+    public string NumericSubType { get; set; } = "integer";
 }
 
 public enum PlistElementType
