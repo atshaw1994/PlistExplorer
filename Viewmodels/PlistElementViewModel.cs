@@ -177,19 +177,58 @@ public partial class PlistElementViewModel : ObservableObject
     }
 
     // Keep DisplayName updated whenever a child's name or value changes
-    partial void OnElementNameChanged(string value) 
-    { 
+    partial void OnElementNameChanged(string value)
+    {
         Model.ElementName = value;
+        if (Model.RawXElement != null)
+        {
+            var previousNode = Model.RawXElement.PreviousNode as XElement;
+            if (previousNode != null && previousNode.Name.LocalName.Equals("key", StringComparison.OrdinalIgnoreCase))
+            {
+                previousNode.Value = value ?? string.Empty;
+            }
+        }
         OnPropertyChanged(nameof(DisplayName));
     }
-    partial void OnElementTypeChanged(PlistElementType value) 
-    { 
+
+    partial void OnElementTypeChanged(PlistElementType value)
+    {
         Model.ElementType = value;
+
+        // Keep the XML element name in sync with the new type
+        if (Model.RawXElement != null)
+        {
+            string newXmlName = value switch
+            {
+                PlistElementType.String => "string",
+                PlistElementType.Number => "integer",
+                PlistElementType.Boolean => "true",
+                PlistElementType.Data => "data",
+                PlistElementType.Date => "date",
+                PlistElementType.Dictionary => "dict",
+                PlistElementType.Array => "array",
+                _ => "string"
+            };
+
+            Model.RawXElement.Name = newXmlName;
+        }
+
         OnPropertyChanged(nameof(ElementType));
     }
+
     partial void OnElementValueChanged(object? value)
     {
         Model.ElementValue = value;
+
+        // Sync the value directly to the XML element for primitive types safely
+        if (Model.RawXElement != null &&
+            Model.ElementType != PlistElementType.Dictionary &&
+            Model.ElementType != PlistElementType.Array)
+        {
+            // Prevent ArgumentNullException by using string.Empty for null inputs
+            Model.RawXElement.Value = value?.ToString() ?? string.Empty;
+        }
+
         OnPropertyChanged(nameof(IsFalseBoolean));
         OnPropertyChanged(nameof(DisplayName));
     }

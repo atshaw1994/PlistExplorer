@@ -189,31 +189,36 @@ public partial class MainViewModel : ObservableObject
 
     private void ParseContainerChildren(XElement containerElement, ObservableCollection<PlistElementViewModel> targetCollection)
     {
-        PlistElementType containerType = GetPlistElementType(containerElement);
+        var childElements = containerElement.Elements().ToList();
 
-        if (containerType == PlistElementType.Dictionary)
+        if (containerElement.Name.LocalName.Equals("dict", StringComparison.OrdinalIgnoreCase))
         {
-            var nodes = containerElement.Elements().ToList();
-            for (int i = 0; i < nodes.Count; i++)
+            for (int i = 0; i < childElements.Count; i++)
             {
-                if (nodes[i].Name.LocalName == "key")
+                var keyElement = childElements[i];
+
+                if (keyElement.Name.LocalName.Equals("key", StringComparison.OrdinalIgnoreCase))
                 {
-                    string childKey = nodes[i].Value;
-                    if (i + 1 < nodes.Count)
+                    // Ensure a value element actually exists after the key tag
+                    if (i + 1 < childElements.Count)
                     {
-                        XElement valueElement = nodes[i + 1];
-                        AddElementToCollection(valueElement, childKey, targetCollection);
-                        i++;
+                        var valueElement = childElements[i + 1];
+                        AddElementToCollection(valueElement, keyElement.Value, targetCollection);
+                        i++; // Skip the value element on the next iteration
+                    }
+                    else
+                    {
+                        // Handle orphan key gracefully
+                        break;
                     }
                 }
             }
         }
-        else if (containerType == PlistElementType.Array)
+        else if (containerElement.Name.LocalName.Equals("array", StringComparison.OrdinalIgnoreCase))
         {
-            int index = 0;
-            foreach (XElement childElement in containerElement.Elements())
+            foreach (var element in childElements)
             {
-                AddElementToCollection(childElement, $"Item {index++}", targetCollection);
+                AddElementToCollection(element, "Item", targetCollection);
             }
         }
     }
@@ -243,6 +248,7 @@ public partial class MainViewModel : ObservableObject
         var viewModel = new PlistElementViewModel(model);
         targetCollection.Add(viewModel);
     }
+
     private static PlistElementType GetPlistElementType(XElement element) => element.Name.LocalName.ToLowerInvariant() switch
     {
         "dict" => PlistElementType.Dictionary,
