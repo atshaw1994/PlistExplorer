@@ -13,7 +13,6 @@ namespace PlistExplorer.Viewmodels
     {
         private readonly Stack<List<PlistElementViewModel>> _backStack = new();
         private readonly Stack<List<PlistElementViewModel>> _forwardStack = new();
-        private readonly Stack<PlistElementViewModel> _parentContainerStack = new();
         private readonly List<string> _pathSegments = [];
         private bool CanNavigateBack() => _backStack.Count > 0;
         private bool CanNavigateForward() => _forwardStack.Count > 0;
@@ -117,6 +116,78 @@ namespace PlistExplorer.Viewmodels
         }
 
         [RelayCommand]
+        public void AddNewElement(string elementType)
+        {
+            switch (elementType)
+            {
+                case "Dict":
+                    LoadedElements.Add(new PlistElementViewModel(new PlistElement
+                    {
+                        ElementName = "NewDictionary",
+                        ElementType = PlistElementType.Dictionary
+                    }));
+                    break;
+                case "Array":
+                    LoadedElements.Add(new PlistElementViewModel(new PlistElement
+                    {
+                        ElementName = "NewArray",
+                        ElementType = PlistElementType.Array
+                    }));
+                    break;
+                case "Boolean":
+                    LoadedElements.Add(new PlistElementViewModel(new PlistElement
+                    {
+                        ElementName = "NewBoolean",
+                        ElementType = PlistElementType.Boolean,
+                        ElementValue = false
+                    }));
+                    break;
+                case "Data":
+                    LoadedElements.Add(new PlistElementViewModel(new PlistElement
+                    {
+                        ElementName = "NewData",
+                        ElementType = PlistElementType.Data,
+                        ElementValue = string.Empty
+                    }));
+                    break;
+                case "Date":
+                    LoadedElements.Add(new PlistElementViewModel(new PlistElement
+                    {
+                        ElementName = "NewDate",
+                        ElementType = PlistElementType.Date,
+                        ElementValue = DateTime.Now
+                    }));
+                    break;
+                case "Number":
+                    LoadedElements.Add(new PlistElementViewModel(new PlistElement
+                    {
+                        ElementName = "NewNumber",
+                        ElementType = PlistElementType.Number,
+                        ElementValue = 0
+                    }));
+                    break;
+                case "UID":
+                    LoadedElements.Add(new PlistElementViewModel(new PlistElement
+                    {
+                        ElementName = "NewUID",
+                        ElementType = PlistElementType.UID,
+                        ElementValue = string.Empty
+                    }));
+                    break;
+                case "String":
+                    LoadedElements.Add(new PlistElementViewModel(new PlistElement
+                    {
+                        ElementName = "NewString",
+                        ElementType = PlistElementType.String,
+                        ElementValue = string.Empty
+                    }));
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        [RelayCommand]
         public void SelectElement(PlistElementViewModel targetElement)
         {
             // If Ctrl is held down, toggle selection for multi-select
@@ -149,6 +220,15 @@ namespace PlistExplorer.Viewmodels
             if (element != null && LoadedElements.Contains(element))
             {
                 LoadedElements.Remove(element);
+            }
+        }
+
+        [RelayCommand]
+        public void EditElement(PlistElementViewModel element)
+        {
+            if (element != null && LoadedElements.Contains(element))
+            {
+                OpenEditWindowForLeaf(element);
             }
         }
 
@@ -208,22 +288,41 @@ namespace PlistExplorer.Viewmodels
 
         private static void OpenEditWindowForLeaf(PlistElementViewModel element)
         {
-            var container = new PlistElementViewModel(new PlistElement
+            // 1. Create a deep or detached copy for editing so changes aren't live until saved
+            var tempModel = new PlistElement
             {
                 ElementName = element.ElementName,
-                ElementType = PlistElementType.Dictionary
+                ElementType = element.ElementType,
+                ElementValue = element.ElementValue,
+                RawXElement = element.Model.RawXElement != null ? new XElement(element.Model.RawXElement) : null
+            };
+
+            var tempViewModel = new PlistElementViewModel(tempModel);
+
+            var container = new PlistElementViewModel(new PlistElement
+            {
+                ElementName = tempModel.ElementName,
+                ElementType = tempModel.ElementType
             });
 
-            container.Children.Add(element);
+            container.Children.Add(tempViewModel);
 
             var editViewModel = new EditPlistElementViewModel(container);
             var editWindow = new EditPlistElementWindow
             {
                 DataContext = editViewModel,
-                Owner = System.Windows.Application.Current.MainWindow
+                Owner = Application.Current.MainWindow
             };
 
-            editWindow.ShowDialog();
+            // 2. Wait for the modal dialog to complete
+            if (editWindow.ShowDialog() == true)
+            {
+                // 3. Sync changes from the edited copy back onto the original ViewModel
+                element.ElementName = tempViewModel.ElementName;
+                element.ElementType = tempViewModel.ElementType;
+                element.ElementValue = tempViewModel.ElementValue;
+                element.Model.RawXElement = tempViewModel.Model.RawXElement;
+            }
         }
 
         private static XElement ToXElement(PlistElementViewModel vm)

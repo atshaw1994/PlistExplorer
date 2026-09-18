@@ -18,12 +18,5 @@ public class PlistElement
 
 public enum PlistElementType
 {
-    String,
-    Number,
-    UID,
-    Boolean,
-    Date,
-    Data,
-    Array,
-    Dictionary
+    Dictionary, Array, Boolean, Data, Date, Number, UID, String
 }

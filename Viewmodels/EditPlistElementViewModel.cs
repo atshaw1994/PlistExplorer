@@ -2,6 +2,7 @@
 using CommunityToolkit.Mvvm.Input;
 using PlistExplorer.Models;
 using System.Collections.ObjectModel;
+using System.Windows;
 
 namespace PlistExplorer.Viewmodels;
 
@@ -13,34 +14,13 @@ public partial class EditPlistElementViewModel(PlistElementViewModel targetEleme
 
     [ObservableProperty] public partial PlistElementViewModel? SelectedProperty { get; set; } = null;
 
-    // Fields for adding a new entry
-    [ObservableProperty] public partial string NewKey { get; set; } = string.Empty;
-
-    [ObservableProperty] public partial PlistElementType NewType { get; set; } = PlistElementType.String;
-
-    public static Array AvailableTypes => Enum.GetValues<PlistElementType>();
-
     [RelayCommand]
-    public void AddProperty()
+    public static void Save(Window window)
     {
-        if (string.IsNullOrWhiteSpace(NewKey)) return;
-
-        Properties.Add(new PlistElementViewModel
+        if (window != null)
         {
-            ElementName = NewKey,
-            ElementType = NewType,
-            ElementValue = string.Empty
-        });
-
-        NewKey = string.Empty;
-    }
-
-    [RelayCommand]
-    public void DeleteProperty(PlistElementViewModel property)
-    {
-        if (property != null && Properties.Contains(property))
-        {
-            Properties.Remove(property);
+            window.DialogResult = true; // Signals ShowDialog() to return true
+            window.Close();
         }
     }
 }

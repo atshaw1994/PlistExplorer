@@ -177,8 +177,16 @@ public partial class PlistElementViewModel : ObservableObject
     }
 
     // Keep DisplayName updated whenever a child's name or value changes
-    partial void OnElementNameChanged(string value) => Model.ElementName = value;
-    partial void OnElementTypeChanged(PlistElementType value) => Model.ElementType = value;
+    partial void OnElementNameChanged(string value) 
+    { 
+        Model.ElementName = value;
+        OnPropertyChanged(nameof(DisplayName));
+    }
+    partial void OnElementTypeChanged(PlistElementType value) 
+    { 
+        Model.ElementType = value;
+        OnPropertyChanged(nameof(ElementType));
+    }
     partial void OnElementValueChanged(object? value)
     {
         Model.ElementValue = value;

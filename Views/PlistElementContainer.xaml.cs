@@ -2,6 +2,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace PlistExplorer.Views
 {
@@ -15,6 +16,21 @@ namespace PlistExplorer.Views
             InitializeComponent();
         }
 
+        private void OnContainerPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.OriginalSource is DependencyObject source && DataContext is PlistElementContainerViewModel containerVm)
+            {
+                if (!IsClickOnElementTile(source))
+                {
+                    // Set focus so keyboard shortcuts (Ctrl+C / Ctrl+V) work immediately
+                    Focus();
+
+                    // Deselect all items in the container
+                    containerVm.DeselectAll();
+                }
+            }
+        }
+
         private void OnContainerPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
         {
             // Check if the right-click landed directly on the container/whitespace 
@@ -24,6 +40,21 @@ namespace PlistExplorer.Views
                 // Deselect all items in the container
                 containerVm.DeselectAll();
             }
+        }
+
+        private static bool IsClickOnElementTile(DependencyObject source)
+        {
+            // Walk up the visual tree from the clicked target
+            DependencyObject? current = source;
+            while (current != null && current != source)
+            {
+                if (current is PlistElementView)
+                {
+                    return true;
+                }
+                current = VisualTreeHelper.GetParent(current);
+            }
+            return source is PlistElementView;
         }
     }
 }
