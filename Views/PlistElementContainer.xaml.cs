@@ -56,5 +56,13 @@ namespace PlistExplorer.Views
             }
             return source is PlistElementView;
         }
+
+        private void OnContextMenuOpened(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is PlistElementContainerViewModel containerVm)
+            {
+                containerVm.RefreshCanPasteElements();
+            }
+        }
     }
 }

@@ -81,9 +81,44 @@ namespace PlistExplorer.Viewmodels
 
             // Place raw XML text onto the OS clipboard
             Clipboard.SetText(xmlBuilder.ToString().Trim());
+
+            RefreshCanPasteElements();
         }
 
-        [RelayCommand]
+        // Determines whether the clipboard currently holds text that represents one or more
+        // valid plist elements, used both as the PasteElements CanExecute check and to
+        // control the visibility of the "Paste" context menu item.
+        [ObservableProperty] public partial bool CanPasteElements { get; set; }
+
+        // Re-evaluates CanPasteElements against the current clipboard contents. Should be called
+        // whenever the clipboard may have changed (e.g. after a copy, or right before the
+        // "Paste" context menu is shown) since there is no clipboard-changed notification to bind to.
+        public void RefreshCanPasteElements()
+        {
+            CanPasteElements = ComputeCanPasteElements();
+        }
+
+        private bool ComputeCanPasteElements()
+        {
+            if (!Clipboard.ContainsText()) return false;
+
+            string clipboardText = Clipboard.GetText().Trim();
+            if (string.IsNullOrWhiteSpace(clipboardText)) return false;
+
+            try
+            {
+                string wrappedXml = $"<root>{clipboardText}</root>";
+                var parsedXml = XElement.Parse(wrappedXml);
+
+                return parsedXml.Elements().Any(node => ParseElementFromXml(node) != null);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        [RelayCommand(CanExecute = nameof(CanPasteElements))]
         public void PasteElements()
         {
             if (!Clipboard.ContainsText()) return;

@@ -15,6 +15,7 @@ public partial class MainViewModel : ObservableObject
     private string? _currentFilePath;
     private readonly IRecentFilesService _recentFilesService;
     private string _baseWindowTitle = "PlistExplorer";
+    private bool IsInitialDocument = false;
 
     // The full XML document (declaration + DOCTYPE + root) for the currently loaded/created plist.
     // Using XDocument instead of a bare XElement preserves the <?xml ... ?> declaration and the
@@ -37,22 +38,58 @@ public partial class MainViewModel : ObservableObject
     {
         _recentFilesService = recentFilesService;
 
-        // Load persisted files on startup
+        // Load persisted files on startup, skipping any that no longer exist on disk
         var loaded = _recentFilesService.LoadRecentFiles();
         foreach (var path in loaded)
-            RecentFiles.Add(path);
+        {
+            if (File.Exists(path))
+                RecentFiles.Add(path);
+        }
 
         // Track unsaved changes whenever the element tree is structurally or value-modified
         ContainerViewModel.DataChanged += () => HasUnsavedChanges = true;
-    }
 
-    // Parameterless fallback constructor for WPF/XAML default instantiation
-    public MainViewModel() : this(new RecentFilesService()) 
-    {
-        // Initialize design data
+        // Initialize design data, or a brand new plist document backed by a temp file, so the
+        // app never starts with a blank/unusable state regardless of how it's constructed
+        // (this constructor is the one the DI container picks, not the parameterless one below).
         if (System.ComponentModel.DesignerProperties.GetIsInDesignMode(new DependencyObject()))
         {
             LoadSampleData();
+        }
+        else
+        {
+            CreateNewPlist();
+            IsInitialDocument = true;
+        }
+    }
+
+    // Parameterless fallback constructor for WPF/XAML default instantiation
+    public MainViewModel() : this(new RecentFilesService()) { }
+
+    // Creates a brand new, empty plist document backed by a file in the temp folder so the user
+    // can immediately start building it out. Save/Save As will overwrite this temp file (or a
+    // user-chosen location) once the user is ready to persist their work.
+    [RelayCommand]
+    public void CreateNewPlist()
+    {
+        try
+        {
+            var tempFilePath = Path.Combine(Path.GetTempPath(), $"Untitled-{Guid.NewGuid():N}.plist");
+            var root = new XElement("dict");
+
+            _document = CreatePlistDocument(root);
+            _document.Save(tempFilePath);
+            _currentFilePath = tempFilePath;
+
+            PopulateElements();
+
+            _baseWindowTitle = "PlistExplorer - Untitled.plist";
+            HasUnsavedChanges = false;
+            UpdateWindowTitle();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to create new plist file:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -91,28 +128,6 @@ public partial class MainViewModel : ObservableObject
         LoadPlistFile(filePath);
     }
 
-    // Shared load logic for OpenPlist/OpenFile/OpenRecentFile: loads the document, refreshes the
-    // view models, updates the window title, and records the recent-files entry.
-    private void LoadPlistFile(string filePath)
-    {
-        try
-        {
-            _currentFilePath = filePath;
-            _document = XDocument.Load(filePath);
-
-            PopulateElements();
-
-            _baseWindowTitle = "PlistExplorer - " + Path.GetFileName(_currentFilePath);
-            HasUnsavedChanges = false;
-            UpdateWindowTitle();
-            AddRecentFile(_currentFilePath);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Failed to load plist file:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-
     [RelayCommand(CanExecute = nameof(CanSavePlist))]
     public void SavePlist()
     {
@@ -123,6 +138,11 @@ public partial class MainViewModel : ObservableObject
             SyncDocumentFromViewModel();
             _document.Save(_currentFilePath);
             HasUnsavedChanges = false;
+            if (IsInitialDocument)
+            {
+                AddRecentFile(_currentFilePath);
+                IsInitialDocument = false;
+            }
             MessageBox.Show("File saved successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
@@ -153,11 +173,63 @@ public partial class MainViewModel : ObservableObject
             _baseWindowTitle = "PlistExplorer - " + Path.GetFileName(_currentFilePath);
             HasUnsavedChanges = false;
             UpdateWindowTitle();
+            if (IsInitialDocument)
+            {
+                AddRecentFile(_currentFilePath);
+                IsInitialDocument = false;
+            }
             MessageBox.Show("File saved successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
             MessageBox.Show($"Failed to save file:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
+    public static void Exit() => Application.Current.Shutdown();
+
+    public void PopulateElements()
+    {
+        var initialElements = new ObservableCollection<PlistElementViewModel>();
+
+        XElement? root = _document?.Root;
+        XElement? targetRoot = root?.Name.LocalName == "plist"
+            ? root.Elements().FirstOrDefault()
+            : root;
+
+        if (targetRoot != null)
+        {
+            ParseContainerChildren(targetRoot, initialElements);
+        }
+
+        ContainerViewModel.Initialize(initialElements, targetRoot?.Name.LocalName ?? "dict");
+
+        // Refresh command states for Save / SaveAs UI buttons
+        SavePlistCommand.NotifyCanExecuteChanged();
+        SavePlistAsCommand.NotifyCanExecuteChanged();
+    }
+
+    // Shared load logic for OpenPlist/OpenFile/OpenRecentFile: loads the document, refreshes the
+    // view models, updates the window title, and records the recent-files entry.
+    private void LoadPlistFile(string filePath)
+    {
+        try
+        {
+            _currentFilePath = filePath;
+            _document = XDocument.Load(filePath);
+
+            PopulateElements();
+
+            _baseWindowTitle = "PlistExplorer - " + Path.GetFileName(_currentFilePath);
+            HasUnsavedChanges = false;
+            UpdateWindowTitle();
+            AddRecentFile(_currentFilePath);
+            IsInitialDocument = false;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to load plist file:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -189,31 +261,7 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    public static void Exit() => Application.Current.Shutdown();
-
-    public void PopulateElements()
-    {
-        var initialElements = new ObservableCollection<PlistElementViewModel>();
-
-        XElement? root = _document?.Root;
-        XElement? targetRoot = root?.Name.LocalName == "plist"
-            ? root.Elements().FirstOrDefault()
-            : root;
-
-        if (targetRoot != null)
-        {
-            ParseContainerChildren(targetRoot, initialElements);
-        }
-
-        ContainerViewModel.Initialize(initialElements, targetRoot?.Name.LocalName ?? "dict");
-
-        // Refresh command states for Save / SaveAs UI buttons
-        SavePlistCommand.NotifyCanExecuteChanged();
-        SavePlistAsCommand.NotifyCanExecuteChanged();
-    }
-
-    private void ParseContainerChildren(XElement containerElement, ObservableCollection<PlistElementViewModel> targetCollection)
+    private static void ParseContainerChildren(XElement containerElement, ObservableCollection<PlistElementViewModel> targetCollection)
     {
         var childElements = containerElement.Elements().ToList();
 
@@ -249,7 +297,7 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    private void AddElementToCollection(XElement element, string keyName, ObservableCollection<PlistElementViewModel> targetCollection)
+    private static void AddElementToCollection(XElement element, string keyName, ObservableCollection<PlistElementViewModel> targetCollection)
     {
         // Delegates to the shared helper so booleans, base64 data, and integer/real numbers
         // are parsed with correct, consistent types across the whole app.

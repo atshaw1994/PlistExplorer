@@ -16,7 +16,7 @@
     </UserControl.InputBindings>
 
     <UserControl.ContextMenu>
-        <ContextMenu>
+        <ContextMenu Opened="OnContextMenuOpened">
             <MenuItem Header="New">
                 <MenuItem Header="Dict" Command="{Binding PlacementTarget.DataContext.AddNewElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                           CommandParameter="Dict"/>
@@ -36,7 +36,10 @@
                 <MenuItem Header="String" Command="{Binding PlacementTarget.DataContext.AddNewElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                           CommandParameter="String"/>
             </MenuItem>
-            <MenuItem Header="Paste" Command="{Binding PlacementTarget.DataContext.PasteElementsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+            <MenuItem x:Name="PasteMenuItem" Header="Paste" 
+                      Command="{Binding PlacementTarget.DataContext.PasteElementsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                      Visibility="{Binding PlacementTarget.DataContext.CanPasteElements, RelativeSource={RelativeSource AncestorType=ContextMenu}, 
+                        Converter={StaticResource BooleanToVisibilityConverter}}"/>
         </ContextMenu>
     </UserControl.ContextMenu>
 

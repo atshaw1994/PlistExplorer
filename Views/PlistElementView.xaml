@@ -25,13 +25,15 @@
     </UserControl.InputBindings>
 
     <UserControl.ContextMenu>
-        <ContextMenu>
+        <ContextMenu Opened="OnContextMenuOpened">
             <MenuItem Header="Edit" Command="{Binding PlacementTarget.Tag.EditElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                       CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
             <MenuItem Header="Copy" 
                       Command="{Binding PlacementTarget.Tag.CopySelectedElementsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-            <MenuItem Header="Paste" 
-                      Command="{Binding PlacementTarget.Tag.PasteElementsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+            <MenuItem x:Name="PasteMenuItem" Header="Paste" 
+                      Command="{Binding PlacementTarget.Tag.PasteElementsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                      Visibility="{Binding PlacementTarget.Tag.CanPasteElements, RelativeSource={RelativeSource AncestorType=ContextMenu}, 
+                        Converter={StaticResource BooleanToVisibilityConverter}}"/>
             <Separator/>
             <MenuItem Header="Delete" 
                       Command="{Binding PlacementTarget.Tag.DeleteElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" 
