@@ -187,6 +187,18 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    public void Navigate()
+    {
+        var requestedPath = ContainerViewModel.CurrentPath;
+
+        if (!ContainerViewModel.NavigateToPath(requestedPath))
+        {
+            MessageBox.Show($"Could not find a path matching:\n{requestedPath}", "Invalid Path",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    [RelayCommand]
     public static void Exit() => Application.Current.Shutdown();
 
     public void PopulateElements()

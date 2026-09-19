@@ -429,6 +429,61 @@ namespace PlistExplorer.Viewmodels
             NavigateBack();
         }
 
+        // Attempts to navigate directly to the container described by a typed address such as
+        // "Root/ACPI/Add". Returns false (leaving the current location unchanged) if the path
+        // doesn't resolve to an existing Dictionary/Array container.
+        public bool NavigateToPath(string path)
+        {
+            var segments = (path ?? string.Empty)
+                .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            if (segments.Length == 0 || !segments[0].Equals("Root", StringComparison.OrdinalIgnoreCase))
+            {
+                UpdatePathText();
+                return false;
+            }
+
+            PlistElementViewModel? target = null;
+            IEnumerable<PlistElementViewModel> currentLevel = _rootElements;
+
+            for (int i = 1; i < segments.Length; i++)
+            {
+                var match = currentLevel.FirstOrDefault(e =>
+                    (e.ElementType == PlistElementType.Dictionary || e.ElementType == PlistElementType.Array) &&
+                    e.ElementName.Equals(segments[i], StringComparison.OrdinalIgnoreCase));
+
+                if (match == null)
+                {
+                    UpdatePathText();
+                    return false;
+                }
+
+                target = match;
+                currentLevel = match.Children;
+            }
+
+            if (target == _currentContainer && segments.Length > 1)
+            {
+                // Already at the requested location; nothing to do but keep the path text in sync.
+                UpdatePathText();
+                return true;
+            }
+
+            _backStack.Push(_currentContainer);
+            _forwardStack.Clear();
+
+            _pathSegments.Clear();
+            _pathSegments.AddRange(segments.Length > 0 ? segments.Select((s, i) => i == 0 ? "Root" : s) : ["Root"]);
+            UpdatePathText();
+
+            _currentContainer = target;
+            RefreshDisplayFromSource();
+
+            NotifyCanExecuteChanged();
+
+            return true;
+        }
+
         #endregion
 
         public void Initialize(ObservableCollection<PlistElementViewModel> rootElements, string rootElementType = "dict")
