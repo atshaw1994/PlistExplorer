@@ -27,6 +27,11 @@ namespace PlistExplorer.Viewmodels
 
         public ObservableCollection<PlistElementViewModel> LoadedElements { get; } = [];
 
+        [ObservableProperty] public partial PlistViewMode CurrentViewMode { get; set; } = PlistViewMode.Icon;
+
+        [RelayCommand]
+        public void SetViewMode(PlistViewMode viewMode) => CurrentViewMode = viewMode;
+
         // Raised whenever the underlying element tree is structurally or value-modified
         // (add/delete/paste/leaf edit), so MainViewModel can track unsaved changes.
         public event Action? DataChanged;
