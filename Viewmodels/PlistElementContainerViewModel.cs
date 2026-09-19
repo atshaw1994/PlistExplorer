@@ -119,6 +119,37 @@ namespace PlistExplorer.Viewmodels
             DataChanged?.Invoke();
         }
 
+        // The following commented-out code is for when c# 15 union types are available
+        //
+        //[RelayCommand]
+        //public void AddNewElement(string elementType)
+        //{
+        //    public union PlistValue(string, double, long, bool, DateTime, byte[]);
+        //
+        //    // Guard against invalid XAML parameters
+        //    // 1. Convert the UI string into the closed union domain at the boundary
+        //    if (!PlistType.TryParse(elementType, out PlistType selectedType))
+        //        return; // Guard early against invalid XAML parameters
+
+        //    // 2. Exhaustive match with NO fallback needed!
+        //    PlistElementViewModel newElement = selectedType switch
+        //    {
+        //        PlistType.Dict => new(new PlistElement { ElementName = "NewDictionary", ElementType = PlistElementType.Dictionary }),
+        //        PlistType.Array => new(new PlistElement { ElementName = "NewArray", ElementType = PlistElementType.Array }),
+        //        PlistType.Boolean => new(new PlistElement { ElementName = "NewBoolean", ElementType = PlistElementType.Boolean, ElementValue = false }),
+        //        PlistType.Data => new(new PlistElement { ElementName = "NewData", ElementType = PlistElementType.Data, ElementValue = string.Empty }),
+        //        PlistType.Date => new(new PlistElement { ElementName = "NewDate", ElementType = PlistElementType.Date, ElementValue = DateTime.Now }),
+        //        PlistType.Number => new(new PlistElement { ElementName = "NewNumber", ElementType = PlistElementType.Number, ElementValue = 0 }),
+        //        PlistType.UID => new(new PlistElement { ElementName = "NewUID", ElementType = PlistElementType.UID, ElementValue = string.Empty }),
+        //        PlistType.String => new(new PlistElement { ElementName = "NewString", ElementType = PlistElementType.String, ElementValue = string.Empty })
+        //    };
+
+        //    newElement.ElementName = GetUniqueElementName(newElement.ElementName);
+        //    CurrentSource.Add(newElement);
+        //    LoadedElements.Add(newElement);
+        //    DataChanged?.Invoke();
+        //}
+
         [RelayCommand]
         public void AddNewElement(string elementType)
         {
