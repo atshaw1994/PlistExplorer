@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:PlistExplorer.Views"
+             xmlns:models="clr-namespace:PlistExplorer.Models"
              mc:Ignorable="d" 
              Background="Transparent"
              Focusable="True"
@@ -43,22 +44,48 @@
         </ContextMenu>
     </UserControl.ContextMenu>
 
-    <Border Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}">
+    <DockPanel Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}">
         <ScrollViewer>
             <ItemsControl ItemsSource="{Binding LoadedElements}" HorizontalAlignment="Stretch">
-                <!-- Tiles elements horizontally and wraps them automatically -->
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal" IsItemsHost="True"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
+                <ItemsControl.Style>
+                    <Style TargetType="ItemsControl">
+                        <!-- Default: tiles elements horizontally and wraps them automatically -->
+                        <Setter Property="ItemsPanel">
+                            <Setter.Value>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" IsItemsHost="True"/>
+                                </ItemsPanelTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Setter Property="ItemTemplate">
+                            <Setter.Value>
+                                <DataTemplate>
+                                    <local:PlistElementView Margin="4" Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
+                                </DataTemplate>
+                            </Setter.Value>
+                        </Setter>
 
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <local:PlistElementView Margin="4" Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding CurrentViewMode}" Value="{x:Static models:PlistViewMode.List}">
+                                <Setter Property="ItemsPanel">
+                                    <Setter.Value>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Vertical" IsItemsHost="True"/>
+                                        </ItemsPanelTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter Property="ItemTemplate">
+                                    <Setter.Value>
+                                        <DataTemplate>
+                                            <local:PlistElementListItemView Margin="2" Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
+                                        </DataTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ItemsControl.Style>
             </ItemsControl>
         </ScrollViewer>
-    </Border>
+    </DockPanel>
 </UserControl>
