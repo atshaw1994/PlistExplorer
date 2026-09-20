@@ -6,9 +6,15 @@
         xmlns:ic="clr-namespace:FluentIcons.Wpf;assembly=FluentIcons.Wpf"
         xmlns:local="clr-namespace:PlistExplorer.Views"
         xmlns:vm="clr-namespace:PlistExplorer.Viewmodels"
+        xmlns:models="clr-namespace:PlistExplorer.Models"
+        xmlns:helpers="clr-namespace:PlistExplorer.Helpers"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance Type=vm:MainViewModel, IsDesignTimeCreatable=True}"
         Title="{Binding WindowTitle}" Height="450" Width="800">
+
+    <Window.Resources>
+        <helpers:EnumToBoolConverter x:Key="EnumToBoolConverter"/>
+    </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -58,6 +64,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Orientation="Horizontal" Margin="0,0,8,0">
@@ -73,6 +80,22 @@
                 </StackPanel>
 
                 <TextBlock Grid.Column="1" Text="{Binding ContainerViewModel.CurrentPath}" d:Text="Root" FontSize="16" VerticalAlignment="Center" Margin="8,0,0,0"/>
+
+                <!-- View mode toggle toolbar -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <ToggleButton x:Name="IconViewToggle" Width="28" Height="28" Margin="0,0,4,0"
+                                  ToolTip="Icon view"
+                                  Command="{Binding ContainerViewModel.SetViewModeCommand}" CommandParameter="{x:Static models:PlistViewMode.Icon}"
+                                  IsChecked="{Binding ContainerViewModel.CurrentViewMode, Converter={StaticResource EnumToBoolConverter}, ConverterParameter={x:Static models:PlistViewMode.Icon}, Mode=OneWay}">
+                        <ic:SymbolIcon Symbol="Grid" FontSize="16"/>
+                    </ToggleButton>
+                    <ToggleButton x:Name="ListViewToggle" Width="28" Height="28"
+                                  ToolTip="List view"
+                                  Command="{Binding ContainerViewModel.SetViewModeCommand}" CommandParameter="{x:Static models:PlistViewMode.List}"
+                                  IsChecked="{Binding ContainerViewModel.CurrentViewMode, Converter={StaticResource EnumToBoolConverter}, ConverterParameter={x:Static models:PlistViewMode.List}, Mode=OneWay}">
+                        <ic:SymbolIcon Symbol="List" FontSize="16"/>
+                    </ToggleButton>
+                </StackPanel>
             </Grid>
         </Border>
 
