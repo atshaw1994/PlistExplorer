@@ -300,6 +300,62 @@ namespace PlistExplorer.Viewmodels
             }
         }
 
+        // Moves an element into a target Dictionary/Array element, relocating it from wherever it
+        // currently lives (the visible collection backed by CurrentSource) into target.Children.
+        public void MoveElement(PlistElementViewModel source, PlistElementViewModel target)
+        {
+            if (source == null || target == null || source == target) return;
+
+            bool targetIsContainer = target.ElementType == PlistElementType.Dictionary ||
+                                     target.ElementType == PlistElementType.Array;
+            if (!targetIsContainer) return;
+
+            // Prevent dropping a container into itself or one of its own descendants
+            if (IsDescendant(source, target)) return;
+
+            if (!LoadedElements.Contains(source)) return;
+
+            CurrentSource.Remove(source);
+            LoadedElements.Remove(source);
+
+            if (target.ElementType == PlistElementType.Dictionary)
+            {
+                source.ElementName = GetUniqueChildName(source.ElementName, target.Children);
+            }
+
+            target.Children.Add(source);
+
+            DataChanged?.Invoke();
+        }
+
+        private static bool IsDescendant(PlistElementViewModel node, PlistElementViewModel potentialDescendant)
+        {
+            foreach (var child in node.Children)
+            {
+                if (child == potentialDescendant || IsDescendant(child, potentialDescendant))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static string GetUniqueChildName(string desiredName, IEnumerable<PlistElementViewModel> siblings)
+        {
+            var existingNames = new HashSet<string>(siblings.Select(e => e.ElementName), StringComparer.Ordinal);
+            if (!existingNames.Contains(desiredName)) return desiredName;
+
+            int suffix = 2;
+            string candidate;
+            do
+            {
+                candidate = $"{desiredName} ({suffix})";
+                suffix++;
+            } while (existingNames.Contains(candidate));
+
+            return candidate;
+        }
+
         [RelayCommand]
         public void DeleteElement(PlistElementViewModel element)
         {

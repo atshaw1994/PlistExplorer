@@ -12,7 +12,12 @@
              ToolTip="{Binding DisplayName}"
              Height="128" Width="96"
              d:DataContext="{d:DesignInstance Type=vm:PlistElementViewModel, IsDesignTimeCreatable=True}"
-             PreviewMouseRightButtonDown="OnPreviewMouseRightButtonDown">
+             AllowDrop="True"
+             PreviewMouseRightButtonDown="OnPreviewMouseRightButtonDown"
+             PreviewMouseLeftButtonDown="OnPreviewMouseLeftButtonDown"
+             PreviewMouseMove="OnPreviewMouseMove"
+             DragOver="OnDragOver"
+             Drop="OnDrop">
     <UserControl.Resources>
         <helpers:ElementTypeToIconConverter x:Key="ElementTypeToIconConverter"/>
     </UserControl.Resources>
