@@ -1,66 +1,91 @@
-﻿<UserControl x:Class="PlistExplorer.Views.PlistElementContainer"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:local="clr-namespace:PlistExplorer.Views"
-             xmlns:models="clr-namespace:PlistExplorer.Models"
-             mc:Ignorable="d" 
-             Background="Transparent"
-             Focusable="True"
-             d:DesignHeight="450" d:DesignWidth="800"
-             PreviewMouseLeftButtonDown="OnContainerPreviewMouseLeftButtonDown"
-             PreviewMouseRightButtonDown="OnContainerPreviewMouseRightButtonDown">
+﻿<UserControl
+    x:Class="PlistExplorer.Views.PlistElementContainer"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="clr-namespace:PlistExplorer.Views"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="clr-namespace:PlistExplorer.Models"
+    d:DesignHeight="450"
+    d:DesignWidth="800"
+    Background="Transparent"
+    Focusable="True"
+    PreviewMouseLeftButtonDown="OnContainerPreviewMouseLeftButtonDown"
+    PreviewMouseRightButtonDown="OnContainerPreviewMouseRightButtonDown"
+    mc:Ignorable="d">
     <UserControl.InputBindings>
-        <KeyBinding Key="C" Modifiers="Control" Command="{Binding CopySelectedElementsCommand}" />
-        <KeyBinding Key="V" Modifiers="Control" Command="{Binding PasteElementsCommand}" />
+        <KeyBinding
+            Key="C"
+            Command="{Binding CopySelectedElementsCommand}"
+            Modifiers="Control" />
+        <KeyBinding
+            Key="V"
+            Command="{Binding PasteElementsCommand}"
+            Modifiers="Control" />
     </UserControl.InputBindings>
 
     <UserControl.ContextMenu>
         <ContextMenu Opened="OnContextMenuOpened">
             <MenuItem Header="New">
-                <MenuItem Header="Dict" Command="{Binding PlacementTarget.DataContext.AddNewElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                          CommandParameter="Dict"/>
-                <MenuItem Header="Array" Command="{Binding PlacementTarget.DataContext.AddNewElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                          CommandParameter="Array"/>
-                <Separator/>
-                <MenuItem Header="Boolean" Command="{Binding PlacementTarget.DataContext.AddNewElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                          CommandParameter="Boolean"/>
-                <MenuItem Header="Data" Command="{Binding PlacementTarget.DataContext.AddNewElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                          CommandParameter="Data"/>
-                <MenuItem Header="Date" Command="{Binding PlacementTarget.DataContext.AddNewElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                          CommandParameter="Date"/>
-                <MenuItem Header="Number" Command="{Binding PlacementTarget.DataContext.AddNewElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                          CommandParameter="Number"/>
-                <MenuItem Header="UID" Command="{Binding PlacementTarget.DataContext.AddNewElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                          CommandParameter="UID"/>
-                <MenuItem Header="String" Command="{Binding PlacementTarget.DataContext.AddNewElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                          CommandParameter="String"/>
+                <MenuItem
+                    Command="{Binding PlacementTarget.DataContext.AddNewElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                    CommandParameter="Dict"
+                    Header="Dict" />
+                <MenuItem
+                    Command="{Binding PlacementTarget.DataContext.AddNewElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                    CommandParameter="Array"
+                    Header="Array" />
+                <Separator />
+                <MenuItem
+                    Command="{Binding PlacementTarget.DataContext.AddNewElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                    CommandParameter="Boolean"
+                    Header="Boolean" />
+                <MenuItem
+                    Command="{Binding PlacementTarget.DataContext.AddNewElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                    CommandParameter="Data"
+                    Header="Data" />
+                <MenuItem
+                    Command="{Binding PlacementTarget.DataContext.AddNewElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                    CommandParameter="Date"
+                    Header="Date" />
+                <MenuItem
+                    Command="{Binding PlacementTarget.DataContext.AddNewElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                    CommandParameter="Number"
+                    Header="Number" />
+                <MenuItem
+                    Command="{Binding PlacementTarget.DataContext.AddNewElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                    CommandParameter="UID"
+                    Header="UID" />
+                <MenuItem
+                    Command="{Binding PlacementTarget.DataContext.AddNewElementCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                    CommandParameter="String"
+                    Header="String" />
             </MenuItem>
-            <MenuItem x:Name="PasteMenuItem" Header="Paste" 
-                      Command="{Binding PlacementTarget.DataContext.PasteElementsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                      Visibility="{Binding PlacementTarget.DataContext.CanPasteElements, RelativeSource={RelativeSource AncestorType=ContextMenu}, 
-                        Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            <MenuItem
+                x:Name="PasteMenuItem"
+                Command="{Binding PlacementTarget.DataContext.PasteElementsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                Header="Paste"
+                Visibility="{Binding PlacementTarget.DataContext.CanPasteElements, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BooleanToVisibilityConverter}}" />
         </ContextMenu>
     </UserControl.ContextMenu>
 
     <DockPanel Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}">
         <ScrollViewer>
-            <ItemsControl ItemsSource="{Binding LoadedElements}" HorizontalAlignment="Stretch">
+            <ItemsControl HorizontalAlignment="Stretch" ItemsSource="{Binding LoadedElements}">
                 <ItemsControl.Style>
                     <Style TargetType="ItemsControl">
-                        <!-- Default: tiles elements horizontally and wraps them automatically -->
+                        <!--  Default: tiles elements horizontally and wraps them automatically  -->
                         <Setter Property="ItemsPanel">
                             <Setter.Value>
                                 <ItemsPanelTemplate>
-                                    <WrapPanel Orientation="Horizontal" IsItemsHost="True"/>
+                                    <WrapPanel IsItemsHost="True" Orientation="Horizontal" />
                                 </ItemsPanelTemplate>
                             </Setter.Value>
                         </Setter>
                         <Setter Property="ItemTemplate">
                             <Setter.Value>
                                 <DataTemplate>
-                                    <local:PlistElementView Margin="4" Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
+                                    <local:PlistElementView Margin="4" Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ItemsControl}}" />
                                 </DataTemplate>
                             </Setter.Value>
                         </Setter>
@@ -70,14 +95,14 @@
                                 <Setter Property="ItemsPanel">
                                     <Setter.Value>
                                         <ItemsPanelTemplate>
-                                            <StackPanel Orientation="Vertical" IsItemsHost="True"/>
+                                            <StackPanel IsItemsHost="True" Orientation="Vertical" />
                                         </ItemsPanelTemplate>
                                     </Setter.Value>
                                 </Setter>
                                 <Setter Property="ItemTemplate">
                                     <Setter.Value>
                                         <DataTemplate>
-                                            <local:PlistElementListItemView Margin="2" Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
+                                            <local:PlistElementListItemView Margin="2" Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ItemsControl}}" />
                                         </DataTemplate>
                                     </Setter.Value>
                                 </Setter>

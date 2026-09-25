@@ -1,29 +1,35 @@
-﻿<Window x:Class="PlistExplorer.Views.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:ic="clr-namespace:FluentIcons.Wpf;assembly=FluentIcons.Wpf"
-        xmlns:local="clr-namespace:PlistExplorer.Views"
-        xmlns:vm="clr-namespace:PlistExplorer.Viewmodels"
-        xmlns:models="clr-namespace:PlistExplorer.Models"
-        xmlns:helpers="clr-namespace:PlistExplorer.Helpers"
-        mc:Ignorable="d"
-        d:DataContext="{d:DesignInstance Type=vm:MainViewModel, IsDesignTimeCreatable=True}"
-        Title="{Binding WindowTitle}" Height="450" Width="800">
+﻿<Window
+    x:Class="PlistExplorer.Views.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="http://metro.mahapps.com/winfx/xaml/controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:helpers="clr-namespace:PlistExplorer.Helpers"
+    xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+    xmlns:ic="clr-namespace:FluentIcons.Wpf;assembly=FluentIcons.Wpf"
+    xmlns:local="clr-namespace:PlistExplorer.Views"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="clr-namespace:PlistExplorer.Models"
+    xmlns:vm="clr-namespace:PlistExplorer.Viewmodels"
+    Title="{Binding WindowTitle}"
+    Width="800"
+    Height="450"
+    d:DataContext="{d:DesignInstance Type=vm:MainViewModel,
+                                     IsDesignTimeCreatable=True}"
+    mc:Ignorable="d">
 
     <Window.Resources>
-        <helpers:EnumToBoolConverter x:Key="EnumToBoolConverter"/>
+        <helpers:EnumToBoolConverter x:Key="EnumToBoolConverter" />
     </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Menu Style="{x:Null}" Height="24">
+        <Menu Height="24">
             <Menu.Resources>
                 <ResourceDictionary>
                     <ResourceDictionary.MergedDictionaries>
@@ -31,75 +37,113 @@
                     </ResourceDictionary.MergedDictionaries>
                 </ResourceDictionary>
             </Menu.Resources>
-            <MenuItem Header="_File" Margin="4,4,0,0">
-                <MenuItem Header="_Open" Command="{Binding OpenPlistCommand}">
+            <MenuItem Margin="4,4,0,0" Header="_File">
+                <MenuItem Command="{Binding OpenPlistCommand}" Header="_Open">
                     <MenuItem.Icon>
-                        <ic:FluentIcon Icon="FolderOpen" Width="16" Height="16"/>
+                        <ic:FluentIcon
+                            Width="16"
+                            Height="16"
+                            Icon="FolderOpen" />
                     </MenuItem.Icon>
                 </MenuItem>
-                <MenuItem Header="_Save" Command="{Binding SavePlistCommand}">
+                <MenuItem Command="{Binding SavePlistCommand}" Header="_Save">
                     <MenuItem.Icon>
-                        <ic:FluentIcon Icon="Save" Width="16" Height="16"/>
+                        <ic:FluentIcon
+                            Width="16"
+                            Height="16"
+                            Icon="Save" />
                     </MenuItem.Icon>
                 </MenuItem>
-                <MenuItem Header="S_ave As..." Command="{Binding SavePlistAsCommand}"/>
-                <Separator/>
+                <MenuItem Command="{Binding SavePlistAsCommand}" Header="S_ave As..." />
+                <Separator />
                 <MenuItem Header="Recents" ItemsSource="{Binding RecentFiles}">
                     <MenuItem.ItemContainerStyle>
                         <Style TargetType="MenuItem">
-                            <Setter Property="Header" Value="{Binding}"/>
-                            <Setter Property="Command" Value="{Binding DataContext.OpenRecentFileCommand, RelativeSource={RelativeSource AncestorType=Menu}}"/>
-                            <Setter Property="CommandParameter" Value="{Binding}"/>
+                            <Setter Property="Header" Value="{Binding}" />
+                            <Setter Property="Command" Value="{Binding DataContext.OpenRecentFileCommand, RelativeSource={RelativeSource AncestorType=Menu}}" />
+                            <Setter Property="CommandParameter" Value="{Binding}" />
                         </Style>
                     </MenuItem.ItemContainerStyle>
                 </MenuItem>
-                <Separator/>
-                <MenuItem Header="E_xit" Command="{Binding ExitCommand}"/>
-            </MenuItem> 
+                <Separator />
+                <MenuItem Command="{Binding ExitCommand}" Header="E_xit" />
+            </MenuItem>
         </Menu>
 
-        <!-- Navigation / Breadcrumb Header -->
-        <Border Grid.Row="1" Background="{DynamicResource ControlFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+        <!--  Navigation / Breadcrumb Header  -->
+        <Border
+            Grid.Row="1"
+            Background="{DynamicResource ControlFillColorDefaultBrush}"
+            BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
+            BorderThickness="0,0,0,1">
             <Grid Margin="8">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Orientation="Horizontal" Margin="0,0,8,0">
-                    <Button  Command="{Binding ContainerViewModel.NavigateBackCommand}">
-                        <ic:FluentIcon Icon="ChevronLeft" Width="16" Height="16"/>
+                <StackPanel Margin="0,0,8,0" Orientation="Horizontal">
+                    <Button Command="{Binding ContainerViewModel.NavigateBackCommand}">
+                        <ic:FluentIcon
+                            Width="16"
+                            Height="16"
+                            Icon="ChevronLeft" />
                     </Button>
-                    <Button  Command="{Binding ContainerViewModel.NavigateForwardCommand}">
-                        <ic:FluentIcon Icon="ChevronRight" Width="16" Height="16"/>
+                    <Button Command="{Binding ContainerViewModel.NavigateForwardCommand}">
+                        <ic:FluentIcon
+                            Width="16"
+                            Height="16"
+                            Icon="ChevronRight" />
                     </Button>
-                    <Button  Command="{Binding ContainerViewModel.NavigateUpCommand}">
-                        <ic:FluentIcon Icon="ArrowUp" Width="16" Height="16"/>
+                    <Button Command="{Binding ContainerViewModel.NavigateUpCommand}">
+                        <ic:FluentIcon
+                            Width="16"
+                            Height="16"
+                            Icon="ArrowUp" />
                     </Button>
                 </StackPanel>
 
-                <TextBlock Grid.Column="1" Text="{Binding ContainerViewModel.CurrentPath}" d:Text="Root" FontSize="16" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                <TextBlock
+                    Grid.Column="1"
+                    Margin="8,0,0,0"
+                    VerticalAlignment="Center"
+                    d:Text="Root"
+                    FontSize="16"
+                    Text="{Binding ContainerViewModel.CurrentPath}" />
 
-                <!-- View mode toggle toolbar -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <ToggleButton x:Name="IconViewToggle" Width="28" Height="28" Margin="0,0,4,0"
-                                  ToolTip="Icon view"
-                                  Command="{Binding ContainerViewModel.SetViewModeCommand}" CommandParameter="{x:Static models:PlistViewMode.Icon}"
-                                  IsChecked="{Binding ContainerViewModel.CurrentViewMode, Converter={StaticResource EnumToBoolConverter}, ConverterParameter={x:Static models:PlistViewMode.Icon}, Mode=OneWay}">
-                        <ic:SymbolIcon Symbol="Grid" FontSize="16"/>
+                <!--  View mode toggle toolbar  -->
+                <StackPanel
+                    Grid.Column="2"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Orientation="Horizontal">
+                    <ToggleButton
+                        x:Name="IconViewToggle"
+                        Width="28"
+                        Height="28"
+                        Margin="0,0,4,0"
+                        Command="{Binding ContainerViewModel.SetViewModeCommand}"
+                        CommandParameter="{x:Static models:PlistViewMode.Icon}"
+                        IsChecked="{Binding ContainerViewModel.CurrentViewMode, Converter={StaticResource EnumToBoolConverter}, ConverterParameter={x:Static models:PlistViewMode.Icon}, Mode=OneWay}"
+                        ToolTip="Icon view">
+                        <ic:SymbolIcon FontSize="16" Symbol="Grid" />
                     </ToggleButton>
-                    <ToggleButton x:Name="ListViewToggle" Width="28" Height="28"
-                                  ToolTip="List view"
-                                  Command="{Binding ContainerViewModel.SetViewModeCommand}" CommandParameter="{x:Static models:PlistViewMode.List}"
-                                  IsChecked="{Binding ContainerViewModel.CurrentViewMode, Converter={StaticResource EnumToBoolConverter}, ConverterParameter={x:Static models:PlistViewMode.List}, Mode=OneWay}">
-                        <ic:SymbolIcon Symbol="List" FontSize="16"/>
+                    <ToggleButton
+                        x:Name="ListViewToggle"
+                        Width="28"
+                        Height="28"
+                        Command="{Binding ContainerViewModel.SetViewModeCommand}"
+                        CommandParameter="{x:Static models:PlistViewMode.List}"
+                        IsChecked="{Binding ContainerViewModel.CurrentViewMode, Converter={StaticResource EnumToBoolConverter}, ConverterParameter={x:Static models:PlistViewMode.List}, Mode=OneWay}"
+                        ToolTip="List view">
+                        <ic:SymbolIcon FontSize="16" Symbol="List" />
                     </ToggleButton>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Extracted Container View -->
-        <local:PlistElementContainer Grid.Row="2" DataContext="{Binding ContainerViewModel}"/>
+        <!--  Extracted Container View  -->
+        <local:PlistElementContainer Grid.Row="2" DataContext="{Binding ContainerViewModel}" />
     </Grid>
 </Window>
